@@ -5,6 +5,7 @@
 package main
 
 import (
+	"path/filepath"
 	"sort"
 
 	"github.com/Masterminds/semver/v3"
@@ -14,7 +15,7 @@ import (
 	"github.com/sethvargo/go-githubactions"
 )
 
-func CheckImageUpdates(chart *Chart) (change *Change, err error) {
+func CheckImageUpdates(config *Flags, chart *Chart) (change *Change, err error) {
 	if chart.Config.Source.Image == "" {
 		githubactions.Warningf("chart %q does not have a source image defined", chart.Name)
 		return nil, nil //nolint:nilnil // no error, just no change.
@@ -39,7 +40,7 @@ func CheckImageUpdates(chart *Chart) (change *Change, err error) {
 			continue
 		}
 
-		if v.Prerelease() != "" && !cli.Flags.SupportPreRelease {
+		if v.Prerelease() != "" && !config.SupportPreRelease {
 			continue
 		}
 
@@ -60,13 +61,16 @@ func CheckImageUpdates(chart *Chart) (change *Change, err error) {
 		githubactions.Noticef("updating chart %q app version from %q to %q", chart.Name, chart.OriginalAppVersion, chart.AppVersion.String())
 		githubactions.Noticef("updating chart %q main version from %q to %q", chart.Name, chart.OriginalVersion, chart.Version.String())
 
-		err = chart.WriteUpdatedVersions()
-		if err != nil {
-			return nil, err
+		if !config.DryRun {
+			err = chart.WriteUpdatedVersions()
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		return &Change{
 			Chart:         chart,
+			Path:          filepath.Dir(chart.Path),
 			OldVersion:    chart.OriginalVersion,
 			NewVersion:    chart.Version.String(),
 			OldAppVersion: chart.OriginalAppVersion,
